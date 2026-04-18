@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Billing and Stock Management</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <header>
+        <img src="logo.jpeg" alt="AK Fancy Logo" class="header-logo">
+        <h1>AK Fancy Ellite Billing</h1>
+    </header>
+    <nav>
+        <button onclick="showSection('home')">Home</button>
+        <button onclick="showSection('products')">Products</button>
+        <button onclick="showSection('invoices')">Invoices</button>
+        <button onclick="showSection('stock')">Stock</button>
+        <button onclick="showSection('reports')">Reports</button>
+    </nav>
+    <main>
+        <section id="home-section">
+            <div class="home-content">
+                <div class="home-hero">
+                    <h2>Welcome to AK Fancy Ellite Billing</h2>
+                    <p class="tagline">Your Ultimate Business Management Solution</p>
+                </div>
+                <div class="home-gallery">
+                    <div class="gallery-grid">
+                        <div class="gallery-item">
+                            <img src="Image 1.jpeg" alt="Product 1">
+                        </div>
+                        <div class="gallery-item">
+                            <img src="Image2.jpeg" alt="Product 2">
+                        </div>
+                        <div class="gallery-item">
+                            <img src="image2.1.jpeg" alt="Product 2.1">
+                        </div>
+                        <div class="gallery-item">
+                            <img src="image3.jpeg" alt="Product 3">
+                        </div>
+                        <div class="gallery-item">
+                            <img src="image4.jpeg" alt="Product 4">
+                        </div>
+                        <div class="gallery-item">
+                            <img src="image5.jpeg" alt="Product 5">
+                        </div>
+                        <div class="gallery-item">
+                            <img src="image6.jpeg" alt="Product 6">
+                        </div>
+                    </div>
+                </div>
+                <div class="home-info">
+                    <h3>Features</h3>
+                    <ul>
+                        <li>🏢 Manage Products & Inventory</li>
+                        <li>📊 Track Sales & Generate Invoices</li>
+                        <li>📈 Monitor Profit & Revenue Reports</li>
+                        <li>📦 Stock Management with Low Stock Alerts</li>
+                        <li>🔒 Secure Access with Passcode Protection</li>
+                    </ul>
+                </div>
+            </div>
+        </section>
+        <section id="products-section" style="display:none;">
+            <h2>Products</h2>
+            <div class="section-actions">
+                <button onclick="showAddProductForm()">Add Product</button>
+                <button onclick="generateLabels()">Generate Labels</button>
+            </div>
+            <div class="product-search-row">
+                <input id="productSearch" type="search" placeholder="Search products by name, SKU, or ID">
+            </div>
+            <div id="product-form" style="display:none;" class="product-form-panel">
+                <h3 id="form-title">Add Product</h3>
+                <form id="productForm">
+                    <input type="hidden" id="productId">
+                    <div class="form-row">
+                        <label>Name:<input type="text" id="productName" required></label>
+                        <label>SKU:<input type="text" id="productSku" placeholder="e.g. U10-BB" required></label>
+                    </div>
+                    <div class="form-row">
+                        <label>Price:<input type="number" step="0.01" id="productPrice" required></label>
+                        <label>Cost Price:<input type="number" step="0.01" id="productCostPrice" required></label>
+                    </div>
+                    <div class="form-row">
+                        <label>Quantity:<input type="number" id="productQuantity" required></label>
+                    </div>
+                    <div class="form-row form-actions">
+                        <button type="submit">Save</button>
+                        <button type="button" onclick="hideProductForm()">Cancel</button>
+                    </div>
+                </form>
+            </div>
+            <table id="products-list">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>SKU</th>
+                        <th>Name</th>
+                        <th>Price</th>
+                        <th>Cost Price</th>
+                        <th>Quantity</th>
+                        <th>Barcode</th>
+                        <th>Created Date</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                </tbody>
+            </table>
+            <div id="product-pagination" class="pagination"></div>
+        </section>
+        <section id="invoices-section" style="display:none;">
+            <h2>Invoices</h2>
+            <div class="section-actions">
+                <button onclick="showCreateInvoiceForm()">Create Invoice</button>
+                <button onclick="showInvoiceScanner()">Scan Product QR</button>
+            </div>
+            <div class="invoice-filter-row">
+                <label>From Date: <input type="date" id="invoiceFromDate"></label>
+                <label>To Date: <input type="date" id="invoiceToDate"></label>
+                <button onclick="filterInvoicesByDate()">Filter</button>
+                <button onclick="resetInvoiceFilter()" style="background-color: #6c757d;">Reset</button>
+            </div>
+            <table id="invoices-list">
+                <thead>
+                    <tr>
+                        <th>Invoice ID</th>
+                        <th>Date & Time</th>
+                        <th>Total</th>
+                        <th>Items Count</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                </tbody>
+            </table>
+            <div id="invoice-form" style="display:none;">
+                <h3>Create Invoice</h3>
+                <form id="invoiceForm">
+                    <div id="invoice-items">
+                        <div class="item">
+                            <select class="product-select" required></select>
+                            <input type="number" class="quantity" min="1" required>
+                            <button type="button" onclick="removeItem(this)">Remove</button>
+                        </div>
+                    </div>
+                    <button type="button" onclick="addItem()">Add Item</button><br>
+                    <button type="submit">Create Invoice</button>
+                    <button type="button" onclick="hideInvoiceForm()">Cancel</button>
+                </form>
+            </div>
+            <div id="qr-scanner" style="display:none;">
+                <h3>Scan Product QR</h3>
+                <video id="scanner-video" width="320" height="240" autoplay muted></video>
+                <p id="scanner-status">Point the camera at a product QR code.</p>
+                <button type="button" onclick="stopScanner()">Stop Scanner</button>
+                <button type="button" onclick="hideScanner()">Close</button>
+            </div>
+        </section>
+        <section id="stock-section" style="display:none;">
+            <h2>Stock</h2>
+            <div class="stock-actions">
+                <button class="secondary-button" onclick="sendStockReportEmail('weekly')">Send Weekly Stock Report</button>
+                <button class="secondary-button" onclick="sendStockReportEmail('monthly')">Send Monthly Stock Report</button>
+            </div>
+            <p class="stock-note">Low stock products appear first. Products with quantity below 2 are highlighted.</p>
+            <table id="stock-list">
+                <thead>
+                    <tr>
+                        <th>Product</th>
+                        <th>Quantity</th>
+                        <th>Cost Price</th>
+                        <th>Price</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </section>
+        <section id="reports-section" style="display:none;">
+            <h2>Reports</h2>
+            <div class="report-actions">
+                <div class="quick-buttons">
+                    <button onclick="setThisWeek()">This Week</button>
+                    <button onclick="setThisMonth()">This Month</button>
+                    <button onclick="setToday()">Today</button>
+                </div>
+                <div class="report-filters">
+                    <div class="filter-row">
+                        <label>From Date<br><input type="date" id="fromDate" required></label>
+                        <label>To Date<br><input type="date" id="toDate" required></label>
+                    </div>
+                    <div class="filter-row">
+                        <label>Report Type<br>
+                            <select id="reportType">
+                                <option value="total">Total Profit</option>
+                                <option value="daily">Daily Breakdown</option>
+                            </select>
+                        </label>
+                        <button class="generate-button" onclick="generateProfitReport()">Generate</button>
+                    </div>
+                </div>
+            </div>
+            <div id="profit-report" class="report-output"></div>
+        </section>
+    </main>
+    <script src="https://cdn.jsdelivr.net/npm/jsqr/dist/jsQR.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.1/build/qrcode.min.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>

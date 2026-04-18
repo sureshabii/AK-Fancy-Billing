@@ -1,0 +1,15 @@
+{
+  "name": "billing-stock-management",
+  "version": "1.0.0",
+  "description": "Sample Node.js project for billing and stock management",
+  "main": "app.js",
+  "scripts": {
+    "start": "node app.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "sequelize": "^6.32.1",
+    "sqlite3": "^5.1.6"
+  }
+}
