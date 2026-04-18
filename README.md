@@ -5,7 +5,7 @@ A sample Node.js project for managing billing and stock using Express and Sequel
 ## Installation
 
 1. Clone or download the project.
-2. Run `npm install` to install dependencies.
+2. Run `npm install` to install dependencies..
 
 ## Running the Application
 
