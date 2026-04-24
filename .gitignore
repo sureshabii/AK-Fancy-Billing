@@ -4,6 +4,9 @@ node_modules/
 # SQLite database
 database.sqlite
 
+# Environment variables
+.env
+
 # Logs
 logs/
 *.log
