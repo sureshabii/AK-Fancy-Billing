@@ -1,17 +1,29 @@
+const dns = require('dns');
 const Sequelize = require('sequelize');
+
+// Force IPv4 resolution first for environments like Render that may not route IPv6
+if (dns.setDefaultResultOrder) {
+  dns.setDefaultResultOrder('ipv4first');
+}
 
 // Only load .env in development
 if (process.env.NODE_ENV !== 'production') {
   require('dotenv').config();
 }
 
+// Debug: Log environment
+console.log('NODE_ENV:', process.env.NODE_ENV);
+console.log('DATABASE_URL available:', !!process.env.DATABASE_URL);
+
 const sequelize = process.env.DATABASE_URL
   ? new Sequelize(process.env.DATABASE_URL, {
       dialect: 'postgres',
       protocol: 'postgres',
+      host: process.env.DATABASE_URL.split('@')[1].split(':')[0], // Extract host
       dialectOptions: {
         ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
-        statement_timeout: 30000
+        statement_timeout: 30000,
+        application_name: 'ak-fancy-billing'
       },
       pool: {
         max: 5,
@@ -23,7 +35,9 @@ const sequelize = process.env.DATABASE_URL
         max: 3,
         timeout: 5000
       },
-      logging: process.env.NODE_ENV !== 'production' ? console.log : false
+      logging: process.env.NODE_ENV !== 'production' ? console.log : false,
+      dialectModuleInstance: require('pg'),
+      native: false // Disable native bindings
     })
   : new Sequelize({
       dialect: 'sqlite',
