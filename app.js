@@ -17,12 +17,38 @@ const invoiceRoutes = require('./routes/invoices');
 app.use('/api/products', productRoutes);
 app.use('/api/invoices', invoiceRoutes);
 
+app.get('/test-db', async (req, res) => {
+  try {
+    await db.authenticate();
+    const [result] = await db.query('SELECT NOW()');
+    res.json({
+      status: 'ok',
+      message: 'Database connected successfully',
+      now: result[0].now
+    });
+  } catch (error) {
+    res.status(500).json({
+      status: 'error',
+      message: error.message,
+      details: error.original ? error.original.message : undefined
+    });
+  }
+});
+
 const PORT = process.env.PORT || 3000;
 
-db.sync({ alter: true }).then(() => {
-  app.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
-  });
-}).catch(error => {
-  console.error('Unable to connect to the database:', error);
+// Start server immediately and attempt DB sync
+const server = app.listen(PORT, () => {
+  console.log(`Server listening on port ${PORT}`);
 });
+
+// Attempt database sync
+db.sync({ alter: true })
+  .then(() => {
+    console.log('Database connected and synced successfully');
+  })
+  .catch(error => {
+    console.error('Database error:', error.message);
+    console.error('Full error:', error);
+    // Don't exit - server can still serve requests, reconnection will be attempted
+  });
