@@ -1,6 +1,11 @@
 const express = require('express');
+
+// Only load .env in development
+if (process.env.NODE_ENV !== 'production') {
+  require('dotenv').config();
+}
+
 const db = require('./db');
-require('dotenv').config();
 
 const app = express();
 app.use(express.json());
