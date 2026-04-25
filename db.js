@@ -11,15 +11,10 @@ if (process.env.NODE_ENV !== 'production') {
   require('dotenv').config();
 }
 
-// Debug: Log environment
-console.log('NODE_ENV:', process.env.NODE_ENV);
-console.log('DATABASE_URL available:', !!process.env.DATABASE_URL);
-
 const sequelize = process.env.DATABASE_URL
   ? new Sequelize(process.env.DATABASE_URL, {
       dialect: 'postgres',
       protocol: 'postgres',
-      host: process.env.DATABASE_URL.split('@')[1].split(':')[0], // Extract host
       dialectOptions: {
         ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
         statement_timeout: 30000,

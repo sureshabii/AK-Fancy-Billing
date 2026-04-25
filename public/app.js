@@ -296,12 +296,13 @@ function displayInvoices() {
     const tbody = document.querySelector('#invoices-list tbody');
     tbody.innerHTML = '';
     const invoicesToDisplay = filteredInvoices.length > 0 ? filteredInvoices : invoices;
-    invoicesToDisplay.forEach(invoice => {
+    invoicesToDisplay.forEach((invoice, index) => {
+        const invoiceNumber = index + 1;
         const dateTime = new Date(invoice.date).toLocaleString();
         const itemsCount = invoice.items ? invoice.items.length : 0;
         const row = document.createElement('tr');
         row.innerHTML = `
-            <td>${invoice.id}</td>
+            <td>${invoiceNumber}</td>
             <td>${dateTime}</td>
             <td>₹${invoice.total.toFixed(2)}</td>
             <td>${itemsCount}</td>
@@ -315,18 +316,20 @@ function displayInvoices() {
         
         const detailsRow = document.createElement('tr');
         detailsRow.className = `details-row details-${invoice.id}`;
+        const itemsHtml = (invoice.items || []).length > 0
+            ? `<ul>${(invoice.items || []).map(item => {
+                    const product = products.find(p => p.id == item.productId);
+                    const itemName = item.productName || product?.name || `Unknown (#${item.productId})`;
+                    const unitPrice = parseFloat(item.price || 0).toFixed(2);
+                    const lineTotal = (item.quantity * parseFloat(unitPrice)).toFixed(2);
+                    return `<li><strong>${itemName}</strong> - Qty: ${item.quantity} x ₹${unitPrice} = ₹${lineTotal}</li>`;
+                }).join('')}</ul>`
+            : '<p>No invoice item details are available for this invoice.</p>';
         detailsRow.innerHTML = `
             <td colspan="5">
                 <div class="details-content">
                     <h4>Order Items:</h4>
-                    <ul>
-                        ${(invoice.items || []).map(item => {
-                            const product = products.find(p => p.id == item.productId);
-                            const unitPrice = parseFloat(item.price || 0).toFixed(2);
-                            const lineTotal = (item.quantity * parseFloat(unitPrice)).toFixed(2);
-                            return `<li>${product?.name || 'Unknown'} - Qty: ${item.quantity} x ₹${unitPrice} = ₹${lineTotal}</li>`;
-                        }).join('')}
-                    </ul>
+                    ${itemsHtml}
                 </div>
             </td>
         `;
@@ -662,9 +665,10 @@ function printInvoice(invoice) {
 function renderInvoicePrintHtml(invoice) {
     const lines = (invoice.items || []).map(item => {
         const product = products.find(p => p.id == item.productId);
+        const itemName = item.productName || product?.name || 'Unknown';
         const unitPrice = parseFloat(item.discountedPrice || item.price || 0).toFixed(2);
         const lineTotal = (item.quantity * parseFloat(unitPrice)).toFixed(2);
-        return `<tr><td>${product?.name || 'Unknown'}</td><td>${item.quantity}</td><td>₹${unitPrice}</td><td>₹${lineTotal}</td></tr>`;
+        return `<tr><td>${itemName}</td><td>${item.quantity}</td><td>₹${unitPrice}</td><td>₹${lineTotal}</td></tr>`;
     }).join('');
     return `
         <html>
@@ -785,5 +789,31 @@ function createInvoice(e) {
     .catch(error => {
         alert(error.message);
     });
+}
+
+// Export functions
+function exportProducts() {
+    window.open('/api/products/export/xlsx', '_blank');
+}
+
+function exportInvoices() {
+    const fromDate = document.getElementById('invoiceFromDate')?.value || new Date().toISOString().split('T')[0];
+    const toDate = document.getElementById('invoiceToDate')?.value || new Date().toISOString().split('T')[0];
+    window.open(`/api/invoices/export/xlsx?from=${fromDate}&to=${toDate}`, '_blank');
+}
+
+function exportStock() {
+    window.open('/api/stock/export/xlsx', '_blank');
+}
+
+function exportReports() {
+    const fromDate = document.getElementById('fromDate').value;
+    const toDate = document.getElementById('toDate').value;
+    const reportType = document.getElementById('reportType').value;
+    if (!fromDate || !toDate) {
+        alert('Please select both from and to dates.');
+        return;
+    }
+    window.open(`/api/reports/export/xlsx?from=${fromDate}&to=${toDate}&type=${reportType}`, '_blank');
 }
 

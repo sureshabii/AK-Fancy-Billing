@@ -67,6 +67,7 @@
             <div class="section-actions">
                 <button onclick="showAddProductForm()">Add Product</button>
                 <button onclick="generateLabels()">Generate Labels</button>
+                <button onclick="exportProducts()">Export to Excel</button>
             </div>
             <div class="product-search-row">
                 <input id="productSearch" type="search" placeholder="Search products by name, SKU, or ID">
@@ -92,23 +93,25 @@
                     </div>
                 </form>
             </div>
-            <table id="products-list">
-                <thead>
-                    <tr>
-                        <th>ID</th>
-                        <th>SKU</th>
-                        <th>Name</th>
-                        <th>Price</th>
-                        <th>Cost Price</th>
-                        <th>Quantity</th>
-                        <th>Barcode</th>
-                        <th>Created Date</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                </tbody>
-            </table>
+            <div class="table-responsive">
+                <table id="products-list">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>SKU</th>
+                            <th>Name</th>
+                            <th>Price</th>
+                            <th>Cost Price</th>
+                            <th>Quantity</th>
+                            <th>Barcode</th>
+                            <th>Created Date</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    </tbody>
+                </table>
+            </div>
             <div id="product-pagination" class="pagination"></div>
         </section>
         <section id="invoices-section" style="display:none;">
@@ -116,6 +119,7 @@
             <div class="section-actions">
                 <button onclick="showCreateInvoiceForm()">Create Invoice</button>
                 <button onclick="showInvoiceScanner()">Scan Product QR</button>
+                <button onclick="exportInvoices()">Export to Excel</button>
             </div>
             <div class="invoice-filter-row">
                 <label>From Date: <input type="date" id="invoiceFromDate"></label>
@@ -123,26 +127,28 @@
                 <button onclick="filterInvoicesByDate()">Filter</button>
                 <button onclick="resetInvoiceFilter()" style="background-color: #6c757d;">Reset</button>
             </div>
-            <table id="invoices-list">
-                <thead>
-                    <tr>
-                        <th>Invoice ID</th>
-                        <th>Date & Time</th>
-                        <th>Total</th>
-                        <th>Items Count</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                </tbody>
-            </table>
+            <div class="table-responsive">
+                <table id="invoices-list">
+                    <thead>
+                        <tr>
+                            <th>Invoice No</th>
+                            <th>Date & Time</th>
+                            <th>Total</th>
+                            <th>Items Count</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    </tbody>
+                </table>
+            </div>
             <div id="invoice-form" style="display:none;">
                 <h3>Create Invoice</h3>
                 <form id="invoiceForm">
                     <div id="invoice-items">
                         <div class="item">
                             <select class="product-select" required></select>
-                            <input type="number" class="quantity" min="1" required>
+                            <label>Quantity: <input type="number" class="quantity" min="1" required></label>
                             <button type="button" onclick="removeItem(this)">Remove</button>
                         </div>
                     </div>
@@ -164,19 +170,22 @@
             <div class="stock-actions">
                 <button class="secondary-button" onclick="sendStockReportEmail('weekly')">Send Weekly Stock Report</button>
                 <button class="secondary-button" onclick="sendStockReportEmail('monthly')">Send Monthly Stock Report</button>
+                <button onclick="exportStock()">Export to Excel</button>
             </div>
             <p class="stock-note">Low stock products appear first. Products with quantity below 2 are highlighted.</p>
-            <table id="stock-list">
-                <thead>
-                    <tr>
-                        <th>Product</th>
-                        <th>Quantity</th>
-                        <th>Cost Price</th>
-                        <th>Price</th>
-                    </tr>
-                </thead>
-                <tbody></tbody>
-            </table>
+            <div class="table-responsive">
+                <table id="stock-list">
+                    <thead>
+                        <tr>
+                            <th>Product</th>
+                            <th>Quantity</th>
+                            <th>Cost Price</th>
+                            <th>Price</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
         </section>
         <section id="reports-section" style="display:none;">
             <h2>Reports</h2>
@@ -199,6 +208,7 @@
                             </select>
                         </label>
                         <button class="generate-button" onclick="generateProfitReport()">Generate</button>
+                        <button onclick="exportReports()">Export to Excel</button>
                     </div>
                 </div>
             </div>

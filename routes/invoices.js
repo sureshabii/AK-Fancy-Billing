@@ -3,6 +3,7 @@ const router = express.Router();
 const Invoice = require('../models/Invoice');
 const Product = require('../models/Product');
 const db = require('../db');
+const XLSX = require('xlsx');
 
 // GET all invoices
 router.get('/', async (req, res) => {
@@ -41,10 +42,9 @@ router.get('/profit', async (req, res) => {
         if (!dailyProfits[dateKey]) dailyProfits[dateKey] = 0;
         for (let item of invoice.items) {
           const product = await Product.findByPk(item.productId);
-          if (product) {
-            const profitPerItem = (item.price - product.costPrice) * item.quantity;
-            dailyProfits[dateKey] += profitPerItem;
-          }
+          const costPrice = product ? product.costPrice : (item.costPrice || 0);
+          const profitPerItem = (item.price - costPrice) * item.quantity;
+          dailyProfits[dateKey] += profitPerItem;
         }
       }
       const result = Object.keys(dailyProfits).map(date => ({
@@ -57,10 +57,9 @@ router.get('/profit', async (req, res) => {
       for (let invoice of invoices) {
         for (let item of invoice.items) {
           const product = await Product.findByPk(item.productId);
-          if (product) {
-            const profitPerItem = (item.price - product.costPrice) * item.quantity;
-            totalProfit += profitPerItem;
-          }
+          const costPrice = product ? product.costPrice : (item.costPrice || 0);
+          const profitPerItem = (item.price - costPrice) * item.quantity;
+          totalProfit += profitPerItem;
         }
       }
       res.json({ totalProfit: totalProfit.toFixed(2) });
@@ -106,9 +105,12 @@ router.post('/', async (req, res) => {
       await product.save();
       validatedItems.push({
         productId: item.productId,
+        productName: product.name,
+        sku: product.sku || null,
         quantity: item.quantity,
         price: product.price,
-        discountedPrice
+        discountedPrice,
+        costPrice: product.costPrice
       });
     }
     const invoice = await Invoice.create({ customerName, total, items: validatedItems });
@@ -135,6 +137,58 @@ router.delete('/:id', async (req, res) => {
     }
     await invoice.destroy();
     res.json({ message: 'Invoice deleted successfully' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Export invoices to XLSX with optional date filter
+router.get('/export/xlsx', async (req, res) => {
+  try {
+    const { from, to } = req.query;
+    let whereClause = {};
+
+    if (from && to) {
+      const startDate = new Date(from);
+      const endDate = new Date(to);
+      endDate.setDate(endDate.getDate() + 1);
+      whereClause.date = {
+        [db.Sequelize.Op.gte]: startDate,
+        [db.Sequelize.Op.lt]: endDate
+      };
+    }
+
+    const invoices = await Invoice.findAll({ where: whereClause });
+    const data = [];
+    let invoiceCounter = 1;
+
+    for (let invoice of invoices) {
+      for (let item of invoice.items) {
+        const itemName = item.productName || 'Unknown';
+        const itemSku = item.sku || `SKU-${item.productId}`;
+        data.push({
+          Invoice_No: invoiceCounter,
+          Invoice_ID: invoice.id,
+          Date: invoice.date,
+          Product_Name: itemName,
+          SKU: itemSku,
+          Quantity: item.quantity,
+          Unit_Price: item.price,
+          Line_Total: item.quantity * item.price,
+          Invoice_Total: invoice.total
+        });
+      }
+      invoiceCounter += 1;
+    }
+
+    const ws = XLSX.utils.json_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Invoice Items');
+
+    const buffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+    res.setHeader('Content-Disposition', 'attachment; filename="invoices.xlsx"');
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.send(buffer);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
