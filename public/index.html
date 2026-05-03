@@ -144,6 +144,10 @@
             </div>
             <div id="invoice-form" style="display:none;">
                 <h3>Create Invoice</h3>
+                <div class="barcode-scan-row">
+                    <label>Scan Barcode: <input type="text" id="barcode-scan-input" placeholder="Scan product SKU here" autocomplete="off"></label>
+                    <button type="button" onclick="clearBarcodeScanInput()">Clear</button>
+                </div>
                 <form id="invoiceForm">
                     <div id="invoice-items">
                         <div class="item">

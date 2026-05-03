@@ -2,6 +2,7 @@ let products = [];
 let invoices = [];
 let filteredInvoices = [];
 let scannerStream = null;
+let barcodeScanTimer = null;
 let currentProductPage = 1;
 let searchQuery = '';
 const productsPerPage = 10;
@@ -22,6 +23,11 @@ document.addEventListener('DOMContentLoaded', () => {
         displayProducts();
         updatePagination();
     });
+    const barcodeInput = document.getElementById('barcode-scan-input');
+    if (barcodeInput) {
+        barcodeInput.addEventListener('keydown', handleBarcodeScanInput);
+        barcodeInput.addEventListener('input', handleBarcodeScanInput);
+    }
     showSection('home');
 });
 
@@ -176,32 +182,76 @@ function updatePagination() {
 }
 
 function generateLabels() {
+    const labelWidthMm = 48.5;
+    const labelHeightMm = 23;
+    const labelGapMm = 4;
+    const labelPaddingMm = 1.5;
+    const barcodeHeightMm = 12;
+    const mmToPx = 3.77953;
+    const barcodeWidthPx = Math.round((labelWidthMm - 8) * mmToPx);
+    const barcodeHeightPx = Math.round(barcodeHeightMm * mmToPx);
+
     const labelWindow = window.open('', '_blank', 'width=900,height=700');
-    const labelCards = products.map(product => `
+    const labelCards = products.map(product => {
+        const displayPrice = Number.isInteger(product.price) ? product.price.toFixed(0) : product.price.toFixed(2);
+        return `
         <div class="label-card">
-            <div class="label-text"><strong>${product.name}</strong></div>
-            <div class="label-text">Price: ₹${product.price.toFixed(2)}</div>
-            <div class="label-text">SKU: ${product.sku || `(auto-${product.id})`}</div>
-            <canvas id="label-barcode-${product.id}" class="label-barcode"></canvas>
+            <div class="label-text label-name"><strong>AK Fancy</strong></div>
+            <canvas id="label-barcode-${product.id}" class="label-barcode" width="${barcodeWidthPx}" height="${barcodeHeightPx}"></canvas>
+            <div class="label-text label-meta"><strong>${product.sku || `(auto-${product.id})`}  ₹${displayPrice}</strong></div>
         </div>
-    `).join('');
+    `;
+    }).join('');
     labelWindow.document.write(`
         <html>
         <head>
             <title>Product Labels</title>
             <style>
-                body { font-family: Arial, sans-serif; padding: 1rem; background: #f4f4f4; }
-                .labels-grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(220px,1fr)); gap: 1rem; }
-                .label-card { background: white; border: 1px solid #ddd; border-radius: 8px; padding: 0.9rem; text-align: center; }
-                .label-text { margin: 0.25rem 0; font-size: 0.95rem; }
-                .label-barcode { margin-top: 0.5rem; width: 100%; }
-                .print-note { margin-bottom: 1rem; color: #333; }
-                button { margin: 0.75rem 0; padding: 0.55rem 1rem; font-size: 0.95rem; }
+                @page { size: 104mm auto; margin: 0; }
+                html, body { width: 104mm; margin: 0; padding: 0; }
+                body { font-family: Arial, sans-serif; background: white; }
+                .labels-grid {
+                    display: grid;
+                    grid-template-columns: repeat(2, 48.5mm);
+                    column-gap: 4mm;
+                    row-gap: 3mm;
+                    width: calc(48.5mm * 2 + 4mm);
+                    margin: 1.5mm auto;
+                    box-sizing: border-box;
+                }
+                .label-card {
+                    width: 48.5mm;
+                    height: 23mm;
+                    background: white;
+                    border: 0.3mm solid #ddd;
+                    border-radius: 3mm;
+                    padding: 1mm 1.5mm 1mm 3mm;
+                    box-sizing: border-box;
+                    text-align: center;
+                    display: flex;
+                    flex-direction: column;
+                    justify-content: space-between;
+                }
+                .label-text {
+                    margin: 0;
+                    font-size: 5.5pt;
+                    line-height: 1;
+                    overflow: hidden;
+                    text-overflow: ellipsis;
+                    white-space: nowrap;
+                }
+                .label-name { font-weight: bold; font-size: 7.5pt; }
+                .label-meta { margin-top: 1mm; font-size: 6pt; font-weight: bold; }
+                .label-barcode { width: 100%; height: ${barcodeHeightMm}mm; margin-top: 1mm; margin-left: 1mm; margin-right: 0; }
+                @media print {
+                    html, body { width: 105mm; margin: 0; padding: 0; }
+                    body { background: white; }
+                    .labels-grid { margin: 0; padding: 0; }
+                    .label-card { border: none; border-radius: 0; page-break-inside: avoid; break-inside: avoid; }
+                }
             </style>
         </head>
         <body>
-            <p class="print-note">Print these labels on your label machine. Use browser print or Ctrl+P.</p>
-            <button onclick="window.print()">Print Labels</button>
             <div class="labels-grid">${labelCards}</div>
         </body>
         </html>
@@ -215,9 +265,9 @@ function generateLabels() {
                     format: 'CODE128',
                     width: 2,
                     height: 50,
-                    displayValue: true,
+                    displayValue: false,
                     margin: 0,
-                    fontSize: 14
+                    fontSize: 0
                 });
             }
         });
@@ -347,10 +397,61 @@ function showCreateInvoiceForm() {
     `;
     updateProductSelects();
     document.getElementById('invoice-form').style.display = 'block';
+    setTimeout(() => {
+        const barcodeInput = document.getElementById('barcode-scan-input');
+        if (barcodeInput) {
+            barcodeInput.focus();
+        }
+    }, 0);
 }
 
 function hideInvoiceForm() {
     document.getElementById('invoice-form').style.display = 'none';
+}
+
+function handleBarcodeScanInput(event) {
+    const input = event.target;
+    if (!input || input.id !== 'barcode-scan-input') return;
+
+    if (event.type === 'keydown' && (event.key === 'Enter' || event.keyCode === 13)) {
+        event.preventDefault();
+        processBarcodeInput(input);
+        return;
+    }
+
+    if (event.type === 'input') {
+        clearTimeout(barcodeScanTimer);
+        barcodeScanTimer = setTimeout(() => processBarcodeInput(input), 250);
+    }
+}
+
+function processBarcodeInput(input) {
+    let scannedValue = input.value.replace(/\r|\n/g, '').trim();
+    if (!scannedValue) return;
+
+    // Strip common scanner prefixes/suffixes
+    scannedValue = scannedValue.replace(/^product[:\-]?/i, '');
+    scannedValue = scannedValue.replace(/^p[:\-]?/i, '');
+    scannedValue = scannedValue.replace(/[\r\n]+$/, '');
+    scannedValue = scannedValue.trim();
+
+    const product = products.find(p => String(p.sku).trim() === scannedValue || String(p.id) === scannedValue);
+    if (!product) {
+        alert(`Product not found for barcode: ${scannedValue}`);
+        input.select();
+        return;
+    }
+
+    addScannedProduct(product.id);
+    input.value = '';
+}
+
+function clearBarcodeScanInput() {
+    const barcodeInput = document.getElementById('barcode-scan-input');
+    if (barcodeInput) {
+        barcodeInput.value = '';
+        barcodeInput.focus();
+    }
 }
 
 function showInvoiceScanner() {
