@@ -6,6 +6,7 @@ let barcodeScanTimer = null;
 let currentProductPage = 1;
 let searchQuery = '';
 const productsPerPage = 10;
+const selectedProductIds = new Set();
 let authorizedSections = {
     products: false,
     reports: false,
@@ -87,15 +88,17 @@ function loadProducts() {
 function displayProducts() {
     const tbody = document.querySelector('#products-list tbody');
     tbody.innerHTML = '';
-    const filteredProducts = getFilteredProducts();
+    const filteredProducts = getFilteredProducts().slice().sort((a, b) => Number(a.id) - Number(b.id));
     const startIndex = (currentProductPage - 1) * productsPerPage;
     const pageItems = filteredProducts.slice(startIndex, startIndex + productsPerPage);
     pageItems.forEach(product => {
         const createdDate = product.createdAt ? new Date(product.createdAt).toLocaleString() : 'N/A';
         const fallbackSku = product.sku || `SKU-${product.id}`;
         const barcodeValue = String(product.sku || fallbackSku);
+        const checked = selectedProductIds.has(product.id) ? 'checked' : '';
         const row = document.createElement('tr');
         row.innerHTML = `
+            <td><input type="checkbox" data-id="${product.id}" ${checked}></td>
             <td>${product.id}</td>
             <td>${product.sku || fallbackSku}</td>
             <td>${product.name}</td>
@@ -113,6 +116,14 @@ function displayProducts() {
             </td>
         `;
         tbody.appendChild(row);
+
+        const checkbox = row.querySelector('input[type="checkbox"]');
+        if (checkbox) {
+            checkbox.addEventListener('change', event => {
+                const productId = Number(event.target.dataset.id);
+                toggleProductSelection(productId, event.target.checked);
+            });
+        }
         
         // Generate barcode for this product
         setTimeout(() => {
@@ -129,12 +140,43 @@ function displayProducts() {
             }
         }, 0);
     });
+
+    const selectAllCheckbox = document.getElementById('select-all-products');
+    if (selectAllCheckbox) {
+        selectAllCheckbox.checked = pageItems.length > 0 && pageItems.every(product => selectedProductIds.has(product.id));
+    }
+}
+
+function getCurrentPageProducts() {
+    const filteredProducts = getFilteredProducts().slice().sort((a, b) => Number(a.id) - Number(b.id));
+    const startIndex = (currentProductPage - 1) * productsPerPage;
+    return filteredProducts.slice(startIndex, startIndex + productsPerPage);
+}
+
+function toggleProductSelection(productId, isSelected) {
+    if (isSelected) {
+        selectedProductIds.add(productId);
+    } else {
+        selectedProductIds.delete(productId);
+    }
+}
+
+function toggleSelectAllProducts(isSelected) {
+    const pageProducts = getCurrentPageProducts();
+    pageProducts.forEach(product => {
+        if (isSelected) {
+            selectedProductIds.add(product.id);
+        } else {
+            selectedProductIds.delete(product.id);
+        }
+    });
+    displayProducts();
 }
 
 function updatePagination() {
     const pagination = document.getElementById('product-pagination');
     pagination.innerHTML = '';
-    const filteredProducts = getFilteredProducts();
+    const filteredProducts = getFilteredProducts().slice().sort((a, b) => Number(a.id) - Number(b.id));
     const totalPages = Math.ceil(filteredProducts.length / productsPerPage) || 1;
     const pageInfo = document.createElement('span');
     pageInfo.textContent = `Page ${currentProductPage} of ${totalPages}`;
@@ -191,8 +233,11 @@ function generateLabels() {
     const barcodeWidthPx = Math.round((labelWidthMm - 8) * mmToPx);
     const barcodeHeightPx = Math.round(barcodeHeightMm * mmToPx);
 
+    const pageProducts = getCurrentPageProducts();
+    const selectedProducts = pageProducts.filter(product => selectedProductIds.has(product.id));
+    const labelProducts = selectedProducts.length ? selectedProducts : pageProducts;
     const labelWindow = window.open('', '_blank', 'width=900,height=700');
-    const labelCards = products.map(product => {
+    const labelCards = labelProducts.map(product => {
         const displayPrice = Number.isInteger(product.price) ? product.price.toFixed(0) : product.price.toFixed(2);
         return `
         <div class="label-card">
@@ -258,7 +303,7 @@ function generateLabels() {
     `);
     labelWindow.document.close();
     labelWindow.onload = () => {
-        products.forEach(product => {
+        labelProducts.forEach(product => {
             const canvas = labelWindow.document.getElementById(`label-barcode-${product.id}`);
             if (canvas) {
                 JsBarcode(canvas, product.sku ? String(product.sku) : String(product.id), {
