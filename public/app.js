@@ -5,8 +5,10 @@ let scannerStream = null;
 let barcodeScanTimer = null;
 let currentProductPage = 1;
 let searchQuery = '';
+let productSort = 'costPrice';
 const productsPerPage = 10;
 const selectedProductIds = new Set();
+const accessSessionCookie = 'akFancyAccessSession';
 let authorizedSections = {
     products: false,
     reports: false,
@@ -24,6 +26,36 @@ document.addEventListener('DOMContentLoaded', () => {
         displayProducts();
         updatePagination();
     });
+    document.getElementById('productSort').addEventListener('change', event => {
+        productSort = event.target.value;
+        currentProductPage = 1;
+        displayProducts();
+        updatePagination();
+    });
+    const invoiceItems = document.getElementById('invoice-items');
+    invoiceItems.addEventListener('click', event => {
+        const option = event.target.closest('.product-option');
+        if (option) {
+            selectInvoiceProduct(option);
+            return;
+        }
+
+        const trigger = event.target.closest('.product-picker-trigger');
+        if (trigger) {
+            toggleProductPicker(trigger.closest('.product-picker'));
+        }
+    });
+    invoiceItems.addEventListener('input', event => {
+        if (event.target.classList.contains('product-search')) {
+            renderProductPickerOptions(event.target.closest('.product-picker'));
+        }
+    });
+    invoiceItems.addEventListener('keydown', handleProductPickerKeydown);
+    document.addEventListener('click', event => {
+        if (!event.target.closest('.product-picker')) {
+            closeProductPickers();
+        }
+    });
     const barcodeInput = document.getElementById('barcode-scan-input');
     if (barcodeInput) {
         barcodeInput.addEventListener('keydown', handleBarcodeScanInput);
@@ -35,16 +67,26 @@ document.addEventListener('DOMContentLoaded', () => {
 function requestAccess(section) {
     const passcode = prompt('Enter passcode to continue:');
     if (passcode === '01012026') {
-        authorizedSections[section] = true;
+        const secureAttribute = location.protocol === 'https:' ? '; Secure' : '';
+        document.cookie = `${accessSessionCookie}=1; Path=/; SameSite=Lax${secureAttribute}`;
+        Object.keys(authorizedSections).forEach(authorizedSection => {
+            authorizedSections[authorizedSection] = true;
+        });
         return true;
     }
     alert('Incorrect passcode. Access denied.');
     return false;
 }
 
+function hasAccessSession() {
+    return document.cookie.split(';').some(cookie => cookie.trim() === `${accessSessionCookie}=1`);
+}
+
 function showSection(section) {
     if ((section === 'products' || section === 'reports' || section === 'stock') && !authorizedSections[section]) {
-        if (!requestAccess(section)) {
+        if (hasAccessSession()) {
+            authorizedSections[section] = true;
+        } else if (!requestAccess(section)) {
             return;
         }
     }
@@ -69,13 +111,25 @@ function getFilteredProducts() {
     });
 }
 
+function getSortedFilteredProducts() {
+    return getFilteredProducts().slice().sort((a, b) => {
+        if (productSort === 'costPrice' || productSort === 'costPriceDesc') {
+            const costDifference = Number(a.costPrice) - Number(b.costPrice);
+            if (costDifference !== 0) {
+                return productSort === 'costPriceDesc' ? -costDifference : costDifference;
+            }
+        }
+        return Number(a.id) - Number(b.id);
+    });
+}
+
 function loadProducts() {
     fetch('/api/products')
         .then(response => response.json())
         .then(data => {
             products = data;
             if (currentProductPage < 1) currentProductPage = 1;
-            const filteredProducts = getFilteredProducts();
+            const filteredProducts = getSortedFilteredProducts();
             const maxPage = Math.ceil(filteredProducts.length / productsPerPage) || 1;
             if (currentProductPage > maxPage) currentProductPage = maxPage;
             displayProducts();
@@ -88,7 +142,7 @@ function loadProducts() {
 function displayProducts() {
     const tbody = document.querySelector('#products-list tbody');
     tbody.innerHTML = '';
-    const filteredProducts = getFilteredProducts().slice().sort((a, b) => Number(a.id) - Number(b.id));
+    const filteredProducts = getSortedFilteredProducts();
     const startIndex = (currentProductPage - 1) * productsPerPage;
     const pageItems = filteredProducts.slice(startIndex, startIndex + productsPerPage);
     pageItems.forEach(product => {
@@ -148,7 +202,7 @@ function displayProducts() {
 }
 
 function getCurrentPageProducts() {
-    const filteredProducts = getFilteredProducts().slice().sort((a, b) => Number(a.id) - Number(b.id));
+    const filteredProducts = getSortedFilteredProducts();
     const startIndex = (currentProductPage - 1) * productsPerPage;
     return filteredProducts.slice(startIndex, startIndex + productsPerPage);
 }
@@ -176,7 +230,7 @@ function toggleSelectAllProducts(isSelected) {
 function updatePagination() {
     const pagination = document.getElementById('product-pagination');
     pagination.innerHTML = '';
-    const filteredProducts = getFilteredProducts().slice().sort((a, b) => Number(a.id) - Number(b.id));
+    const filteredProducts = getSortedFilteredProducts();
     const totalPages = Math.ceil(filteredProducts.length / productsPerPage) || 1;
     const pageInfo = document.createElement('span');
     pageInfo.textContent = `Page ${currentProductPage} of ${totalPages}`;
@@ -433,13 +487,8 @@ function displayInvoices() {
 }
 
 function showCreateInvoiceForm() {
-    document.getElementById('invoice-items').innerHTML = `
-        <div class="item">
-            <select class="product-select" required></select>
-            <input type="number" class="quantity" min="1" required>
-            <button type="button" onclick="removeItem(this)">Remove</button>
-        </div>
-    `;
+    const items = document.getElementById('invoice-items');
+    items.innerHTML = '';
     updateProductSelects();
     document.getElementById('invoice-form').style.display = 'block';
     setTimeout(() => {
@@ -583,17 +632,34 @@ function addScannedProduct(productId) {
         return;
     }
 
-    const itemDiv = document.createElement('div');
-    itemDiv.className = 'item';
-    itemDiv.innerHTML = `
-        <select class="product-select" required></select>
-        <input type="number" class="quantity" min="1" required>
-        <button type="button" onclick="removeItem(this)">Remove</button>
-    `;
+    const itemDiv = createInvoiceItemElement();
     itemsDiv.appendChild(itemDiv);
     updateProductSelects();
-    itemDiv.querySelector('.product-select').value = productId;
+    const productSelect = itemDiv.querySelector('.product-select');
+    productSelect.value = String(productId);
+    updateProductPickerSelection(itemDiv.querySelector('.product-picker'));
     itemDiv.querySelector('.quantity').value = 1;
+}
+
+function createInvoiceItemElement() {
+    const template = document.createElement('template');
+    template.innerHTML = `
+        <div class="item">
+            <div class="product-picker">
+                <button type="button" class="product-picker-trigger" aria-haspopup="listbox" aria-expanded="false" aria-required="true" aria-label="Select product">Select Product</button>
+                <div class="product-picker-dropdown" hidden>
+                    <input type="search" class="product-search" placeholder="Search by name, SKU, or ID" aria-label="Search products">
+                    <div class="product-options" role="listbox" aria-label="Products"></div>
+                    <p class="product-picker-empty" hidden>No matching products</p>
+                </div>
+                <select class="product-select" aria-hidden="true" tabindex="-1"></select>
+                <span class="product-picker-error" role="alert" hidden>Please select a product.</span>
+            </div>
+            <input type="number" class="quantity" min="1" placeholder="Number of Quantity" aria-label="Number of Quantity" required>
+            <button type="button" onclick="removeItem(this)">Remove</button>
+        </div>
+    `;
+    return template.content.firstElementChild;
 }
 
 function updateProductSelects() {
@@ -610,7 +676,120 @@ function updateProductSelects() {
         if (currentValue) {
             select.value = currentValue;
         }
+        updateProductPickerSelection(select.closest('.product-picker'));
     });
+}
+
+function updateProductPickerSelection(picker) {
+    const select = picker.querySelector('.product-select');
+    const trigger = picker.querySelector('.product-picker-trigger');
+    const error = picker.querySelector('.product-picker-error');
+    const product = products.find(item => String(item.id) === select.value);
+
+    trigger.textContent = product
+        ? `${product.name} (₹${product.price.toFixed(2)}, Stock: ${product.quantity})`
+        : 'Select Product';
+    trigger.setAttribute('aria-invalid', String(!product && !error.hidden));
+    if (product) {
+        error.hidden = true;
+    }
+    renderProductPickerOptions(picker);
+}
+
+function renderProductPickerOptions(picker) {
+    const search = picker.querySelector('.product-search');
+    const options = picker.querySelector('.product-options');
+    const emptyMessage = picker.querySelector('.product-picker-empty');
+    const select = picker.querySelector('.product-select');
+    const query = search.value.trim().toLowerCase();
+    const matchingProducts = products.filter(product => {
+        const searchableText = `${product.name} ${product.sku || ''} ${product.id}`.toLowerCase();
+        return searchableText.includes(query);
+    });
+
+    options.innerHTML = '';
+    matchingProducts.forEach(product => {
+        const option = document.createElement('button');
+        option.type = 'button';
+        option.className = 'product-option';
+        option.setAttribute('role', 'option');
+        option.setAttribute('aria-selected', String(String(product.id) === select.value));
+        option.dataset.productId = product.id;
+        option.textContent = `${product.name} (₹${product.price.toFixed(2)}, Stock: ${product.quantity})`;
+        options.appendChild(option);
+    });
+    emptyMessage.hidden = matchingProducts.length > 0;
+}
+
+function toggleProductPicker(picker) {
+    const dropdown = picker.querySelector('.product-picker-dropdown');
+    if (!dropdown.hidden) {
+        closeProductPicker(picker);
+        return;
+    }
+
+    openProductPicker(picker);
+}
+
+function openProductPicker(picker) {
+    closeProductPickers();
+    picker.querySelector('.product-picker-dropdown').hidden = false;
+    picker.querySelector('.product-picker-trigger').setAttribute('aria-expanded', 'true');
+    const search = picker.querySelector('.product-search');
+    search.value = '';
+    renderProductPickerOptions(picker);
+    search.focus();
+}
+
+function closeProductPicker(picker) {
+    picker.querySelector('.product-picker-dropdown').hidden = true;
+    picker.querySelector('.product-picker-trigger').setAttribute('aria-expanded', 'false');
+}
+
+function closeProductPickers() {
+    document.querySelectorAll('.product-picker-dropdown:not([hidden])').forEach(dropdown => {
+        closeProductPicker(dropdown.closest('.product-picker'));
+    });
+}
+
+function selectInvoiceProduct(option) {
+    const picker = option.closest('.product-picker');
+    picker.querySelector('.product-select').value = option.dataset.productId;
+    picker.querySelector('.product-picker-error').hidden = true;
+    updateProductPickerSelection(picker);
+    closeProductPicker(picker);
+    picker.querySelector('.product-picker-trigger').focus();
+}
+
+function handleProductPickerKeydown(event) {
+    if (event.key === 'Escape') {
+        const picker = event.target.closest('.product-picker');
+        if (picker && !picker.querySelector('.product-picker-dropdown').hidden) {
+            event.preventDefault();
+            closeProductPicker(picker);
+            picker.querySelector('.product-picker-trigger').focus();
+        }
+        return;
+    }
+
+    if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;
+    const picker = event.target.closest('.product-picker');
+    if (!picker) return;
+
+    const options = Array.from(picker.querySelectorAll('.product-option'));
+    if (options.length === 0) return;
+    event.preventDefault();
+
+    if (event.target.classList.contains('product-search')) {
+        options[0].focus();
+        return;
+    }
+
+    const currentIndex = options.indexOf(event.target);
+    const nextIndex = event.key === 'ArrowDown'
+        ? Math.min(currentIndex + 1, options.length - 1)
+        : Math.max(currentIndex - 1, 0);
+    options[nextIndex].focus();
 }
 
 function updateStockList() {
@@ -653,14 +832,7 @@ function sendStockReportEmail(type) {
 
 function addItem() {
     const itemsDiv = document.getElementById('invoice-items');
-    const itemDiv = document.createElement('div');
-    itemDiv.className = 'item';
-    itemDiv.innerHTML = `
-        <select class="product-select" required></select>
-        <input type="number" class="quantity" min="1" required>
-        <button type="button" onclick="removeItem(this)">Remove</button>
-    `;
-    itemsDiv.appendChild(itemDiv);
+    itemsDiv.appendChild(createInvoiceItemElement());
     updateProductSelects();
 }
 
@@ -911,8 +1083,24 @@ function showProductQr(productId) {
 
 function createInvoice(e) {
     e.preventDefault();
-    const items = Array.from(document.querySelectorAll('#invoice-items .item')).map(item => ({
-        productId: parseInt(item.querySelector('.product-select').value),
+    const invoiceItems = Array.from(document.querySelectorAll('#invoice-items .item'));
+    if (invoiceItems.length === 0) {
+        alert('Add an item or scan a product before creating an invoice.');
+        return;
+    }
+
+    const invalidItem = invoiceItems.find(item => !item.querySelector('.product-select').value);
+    if (invalidItem) {
+        const picker = invalidItem.querySelector('.product-picker');
+        picker.querySelector('.product-picker-error').hidden = false;
+        picker.querySelector('.product-picker-trigger').setAttribute('aria-invalid', 'true');
+        openProductPicker(picker);
+        picker.querySelector('.product-search').focus();
+        return;
+    }
+
+    const items = invoiceItems.map(item => ({
+        productId: parseInt(item.querySelector('.product-select').value, 10),
         quantity: parseInt(item.querySelector('.quantity').value)
     }));
     fetch('/api/invoices', {

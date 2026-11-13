@@ -71,6 +71,13 @@
             </div>
             <div class="product-search-row">
                 <input id="productSearch" type="search" placeholder="Search products by name, SKU, or ID">
+                <label for="productSort">Sort by
+                    <select id="productSort">
+                        <option value="costPrice">Cost Price (Low to High)</option>
+                        <option value="costPriceDesc">Cost Price (High to Low)</option>
+                        <option value="id">ID (Low to High)</option>
+                    </select>
+                </label>
             </div>
             <div id="product-form" style="display:none;" class="product-form-panel">
                 <h3 id="form-title">Add Product</h3>
@@ -150,13 +157,7 @@
                     <button type="button" onclick="clearBarcodeScanInput()">Clear</button>
                 </div>
                 <form id="invoiceForm">
-                    <div id="invoice-items">
-                        <div class="item">
-                            <select class="product-select" required></select>
-                            <label>Quantity: <input type="number" class="quantity" min="1" required></label>
-                            <button type="button" onclick="removeItem(this)">Remove</button>
-                        </div>
-                    </div>
+                    <div id="invoice-items"></div>
                     <button type="button" onclick="addItem()">Add Item</button><br>
                     <button type="submit">Create Invoice</button>
                     <button type="button" onclick="hideInvoiceForm()">Cancel</button>
